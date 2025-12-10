@@ -1,0 +1,28 @@
+defaults:
+  - data
+  - model
+  - training
+  - inference
+  
+  # Override defaults
+  - _self_
+
+experiment:
+  name: "drone_detection"
+  tags: ["yolov8", "drone", "detection"]
+  notes: "Vision-based search for drones"
+  
+  # Логирование
+  logger:
+    type: "mlflow"
+    tracking_uri: "http://127.0.0.1:8080"
+    experiment_name: "drone_detection"
+  
+  # Пути
+  paths:
+    checkpoints: "./checkpoints"
+    logs: "./logs"
+    outputs: "./outputs"
+  
+  seed: 42
+  device: "cuda"  # или "cpu"

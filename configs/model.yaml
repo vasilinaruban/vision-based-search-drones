@@ -1,0 +1,8 @@
+model:
+  name: "yolov8s"
+  pretrained: true
+  freeze: 0  # количество слоев для заморозки
+  
+  # YOLO-specific
+  depth_multiple: 0.33
+  width_multiple: 0.50

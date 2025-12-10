@@ -1,0 +1,14 @@
+inference:
+  conf_threshold: 0.25
+  iou_threshold: 0.45
+  max_detections: 300
+  
+  # GPS/геоданные
+  drone_height: 40.0  # meters
+  fov_degrees: 90.0
+  
+  # Кластеризация
+  clustering:
+    eps: 0.00009
+    min_samples: 2
+    metric: "euclidean"
