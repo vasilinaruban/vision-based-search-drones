@@ -40,26 +40,39 @@ COLORS = np.array([[0, 0, 0], [244, 67, 54], [233, 30, 99], [156, 39, 176], [103
 CASTOM_CLASSES = ('person', 'backgrnd')
 
 
-
 class ResultSaver:
     """
     Handles saving detected objects and their GPS coordinates
     """
-    def __init__(self, output_path='./results_json', eps=0.00009,
-                 min_samples=2, metrics='euclidean'):
+
+    def __init__(
+        self,
+        output_path: str = "./results_json",
+        eps: float = 0.00009,
+        min_samples: int = 2,
+        metric: str = "euclidean",
+        drone_height_m: float = 40.0,
+        fov_deg: float = 90.0,
+        image_size=(640, 640)):
         self.output_path = output_path
         self.check_out_path(self.output_path)
-        #self.sdcard_output_path = self.get_sd_path(output_path)
-        #self.check_out_path(self.sdcard_output_path)
 
         list_dir = os.listdir(output_path)
-        self.n_image = len(list_dir)//2
-        self.json_number = 0
-        self.boxes_list = []  # xywh
-        self.gps_data_list = [] 
-        self.angles_list = []
-        self.imgs_with_boxes = []
-        self.dbscan = DBSCAN(eps=eps, min_samples=min_samples, metric=metrics)
+        self.n_image = len(list_dir) // 2
+
+        self.eps = eps
+        self.min_samples = min_samples
+        self.metric = metric
+        self.drone_height_m = drone_height_m
+        self.fov_deg = fov_deg
+        self.image_size = image_size
+
+        self.dbscan = DBSCAN(eps=self.eps, min_samples=self.min_samples, metric=self.metric)
+
+        self.boxes_list: list[list[float]] = []
+        self.gps_data_list: list[list[float]] = []
+        self.angles_list: list[float] = []
+        self.imgs_with_boxes: list[str] = []
     
     def check_out_path(self, output_path):
         if not os.path.isdir(output_path):
@@ -123,19 +136,20 @@ class ResultSaver:
         self.n_image += 1
     
     # SAVE JSON METHODS
-    def pix2m(self, drone_lat, drone_lon, drone_height_m,
-                                    bbox_center_xy,  # (x, y) в пикселях
-                                    image_size,      # (width, height)
-                                    angle,
-                                    fov_deg=90       # угол обзора камеры
-                                ):
+    def pix2m(
+        self,
+        drone_lat: float,
+        drone_lon: float,
+        bbox_center_xy: tuple[float, float],
+        image_size: tuple[int, int],
+        angle: float, ) -> tuple[float, float]:
         img_w, img_h = image_size
         cx, cy = bbox_center_xy
 
-        fov_rad = math.radians(fov_deg)
+        fov_rad = math.radians(self.fov_deg)
         aspect_ratio = img_h / img_w
 
-        ground_width_m = 2 * drone_height_m * math.tan(fov_rad / 2)
+        ground_width_m = 2 * self.drone_height_m * math.tan(fov_rad / 2)
         ground_height_m = ground_width_m * aspect_ratio
 
         # Смещение от центра изображения в метрах
@@ -149,19 +163,30 @@ class ResultSaver:
         return final_point.latitude, final_point.longitude
     
     def xyxy2coords(self, boxes, gps_data, angles_data):
-        drone_height_m = 40  # Assuming fixed altitude
+        """
+        Переводит пиксельные координаты xyxy в GPS-координаты каждого бокса.
+        Использует только self.image_size, self.drone_height_m, self.fov_deg и gps_data.
+        """
         res = []
-        # xyxy -> xywh (px)
-        xyboxes = np.empty((len(boxes), 2))  # x_center, y_center
+
+        # xyxy -> центр бокса
+        xyboxes = np.empty((len(boxes), 2))
         for i, box in enumerate(boxes):
-            xyboxes[i, 0] = (box[0] + box[2]) / 2  # x center
-            xyboxes[i, 1] = (box[1] + box[3]) / 2  # y center
-            
-        for i, (box, gps, angle) in enumerate(zip(xyboxes, gps_data, angles_data)):
-            x_px, y_px = box[:2]
-            lat, lon = self.pix2m(gps[0], gps[1], drone_height_m, (x_px, y_px), (640, 640), angle)
+            xyboxes[i, 0] = (box[0] + box[2]) / 2
+            xyboxes[i, 1] = (box[1] + box[3]) / 2
+
+        for (x_px, y_px), gps, angle in zip(xyboxes, gps_data, angles_data):
+            lat, lon = self.pix2m(
+                drone_lat=gps["latitude"],
+                drone_lon=gps["longitude"],
+                bbox_center_xy=(x_px, y_px),
+                image_size=self.image_size,
+                angle=angle,
+            )
             res.append((lat, lon))
+
         return np.array(res)
+
 
     def get_clusters(self):
         """
@@ -200,8 +225,8 @@ class ResultSaver:
         return best_imgs_with_object
     
     def create_object_entry(self, name, center_lat, center_lon, image_files):
-        return {"name": name, "dd.dddddd_lat": f"{center_lat:.7f}",
-                "dd.dddddd_lon": f"{center_lon:.7f}",
+        return {"name": name, "dd.dddddd_lat": f"{center_lat:.6f}",
+                "dd.dddddd_lon": f"{center_lon:.6f}",
                 "images": image_files }
 
     def save_to_json(self, objects_data, json_number):
@@ -359,9 +384,12 @@ class RKNNDetection(Detection):
     """
 
     def __init__(self, queue, cfg=None, result_saver_kwargs=None):
-        super().__init__(queue, cfg)
+        super().__init__(input=queue, cfg=cfg)
+        self.queue = queue
+
         if result_saver_kwargs is None:
             result_saver_kwargs = {}
+
         self.result_saver = ResultSaver(**result_saver_kwargs)
     def run(self):
         while True:
@@ -467,20 +495,18 @@ class PostProcess():
         
     """
     
-    def __init__(self, queue, cfg:None, onnx:True):
-        """
-        Parameters
-        ----------
-        queue : Queue
-            An instance of the "Queue" class with a maximum size of 3, used to store processed frames 
-            and prepared results for display.
-        cfg : dict
-            Configuration settings for the detection process. May include parameters such as 
-            confidence thresholds, maximum number of output predictions, etc. Default is None.
-        onnx : bool
-            Flag indicating whether to use ONNXDetection or RKNNDetection. Default is True.
-        """
-        self.detection = RKNNDetection(queue, cfg)
+    def __init__(self, queue, cfg=None, onnx=True, result_saver_kwargs=None):
+        self.cfg = cfg
+        self.onnx = onnx
+
+        if result_saver_kwargs is None:
+            result_saver_kwargs = {}
+
+        self.detection = RKNNDetection(
+            queue=queue,
+            cfg=cfg,
+            result_saver_kwargs=result_saver_kwargs,
+        )
     
     def run(self):
         self.detection.start()

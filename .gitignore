@@ -1,0 +1,35 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# IDE and editor
+.vscode/
+.idea/
+
+# Logs and artifacts
+logs/
+mlruns/
+plots/
+
+# Data / checkpoints (в гите не храним, только метаданные DVC)
+data/
+datasets/
+checkpoints/
+results_json/
+results_for_zip/
+results.zip
+checksum.txt
+
+# Jupyter
+.ipynb_checkpoints/

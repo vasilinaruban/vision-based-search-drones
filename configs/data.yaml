@@ -1,12 +1,13 @@
-dataset:
-  path: ${oc.env:DATASET_PATH,"/data/drone_dataset"}
-  train: "train/images"
-  val: "val/images"
-  test: "test/images"
-  
-  classes: 1
-  class_names: ["person"]
-  
-  img_size: 640
-  batch_size: 16
-  num_workers: 4
+data:
+  dataset:
+    path: ${oc.env:DATASET_PATH,"/data/drone_dataset"}
+    train: "train/images"
+    val: "val/images"
+    test: "test/images"
+
+    classes: 1
+    class_names: ["person"]
+
+    img_size: 640
+    batch_size: 16
+    num_workers: 4
