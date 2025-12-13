@@ -185,7 +185,7 @@ dvc pull
 После активации виртуального окружения:
 
 ```bash
-uv runvision-train
+uv run vision-train
 ```
 
 Эта команда:
